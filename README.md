@@ -162,6 +162,108 @@ stateMachine
 stateMachine.reset();
 ```
 
+### State Machine Display and Serialization
+
+Visualize and debug your state machine with built-in display and serialization functions. These are especially useful for validation and debugging complex state machines.
+
+#### Display State Machine
+
+Generate a human-readable representation of your state machine:
+
+```typescript
+// Using toString() method
+console.log(stateMachine.toString());
+
+// Or implicitly with String conversion
+console.log(String(stateMachine));
+
+// Or using the explicit method
+const display = stateMachine.generateStateDisplay();
+console.log(display);
+```
+
+The display includes:
+- Current, previous, and initial states
+- All states with their outgoing transitions
+- Timeout configurations (duration, expiration target, active status)
+- Registered callback counts
+- Summary statistics
+
+Example output:
+```
+STATE MACHINE
+Current:  Playing
+Previous: Loading
+Initial:  Menu
+
+  GameOver
+    -> Menu, Playing
+    (timeout: 10000ms, custom callback)
+    [1 callback]
+
+  Loading
+    -> Playing
+    (timeout: 5000ms, expires to Playing)
+
+* Playing
+    -> Paused, GameOver, Victory
+    [1 callback]
+
+  Paused
+    -> Playing, Menu
+    (timeout: 3000ms, expires to Menu)
+
+States: 6 | Transitions: 10 | Timeouts: 3 | Active: 0
+```
+
+#### Serialize State Machine
+
+Generate a JSON-serializable representation:
+
+```typescript
+const serialized = stateMachine.serializeStateMachine();
+const json = JSON.stringify(serialized, null, 2);
+
+// Save to file, send over network, etc.
+fs.writeFileSync('state-machine.json', json);
+```
+
+The serialized format includes:
+- Current, previous, and initial states
+- All states with their transitions
+- Timeout configurations (without callbacks, since they're not serializable)
+- Callback counts
+- Summary statistics
+
+Example output:
+```json
+{
+  "current": "Playing",
+  "previous": "Loading",
+  "initial": "Menu",
+  "states": [
+    {
+      "state": "Loading",
+      "toStates": ["Playing"],
+      "fromStates": ["Menu"],
+      "callbackCount": 0,
+      "timeout": {
+        "timeoutMs": 5000,
+        "expireTo": "Playing",
+        "hasCallback": false,
+        "isActive": false
+      }
+    }
+  ],
+  "summary": {
+    "totalStates": 6,
+    "totalTransitions": 10,
+    "statesWithTimeouts": 3,
+    "activeTimers": 0
+  }
+}
+```
+
 ### Temporal State Expiration
 
 States can be configured to automatically expire after a timeout period. This is useful for scenarios like connection timeouts, session expiration, or operation timeouts.
@@ -402,6 +504,55 @@ sessionFSM.on(SessionState.Active, (from, to) => {
   console.log('User is active, timer cleared');
   // Timer was automatically cleared when transitioning from Idle
 });
+```
+
+### Debugging and Validation Example
+
+Here's how to use the display and serialization functions for debugging:
+
+```typescript
+import { TSM } from 'synth-state';
+
+enum GameState {
+  Menu = 'Menu',
+  Loading = 'Loading',
+  Playing = 'Playing',
+  Paused = 'Paused',
+  GameOver = 'GameOver'
+}
+
+const game = new TSM<GameState>(GameState.Menu);
+
+// Build your state machine
+game.addPath(GameState.Menu, GameState.Loading, GameState.Playing);
+game.addTransition(GameState.Playing, GameState.Paused, true);
+game.addTransitions(GameState.Playing, GameState.GameOver, GameState.Menu);
+
+// Add timeouts
+game.setStateTimeout(GameState.Loading, {
+  timeoutMs: 5000,
+  expireTo: GameState.Playing
+});
+
+game.setStateTimeout(GameState.Paused, {
+  timeoutMs: 3000,
+  expireTo: GameState.Menu
+});
+
+// Display the complete state machine for debugging
+console.log(game.toString());
+
+// Or serialize for validation/testing
+const config = game.serializeStateMachine();
+console.log(`Total states: ${config.summary.totalStates}`);
+console.log(`Total transitions: ${config.summary.totalTransitions}`);
+console.log(`States with timeouts: ${config.summary.statesWithTimeouts}`);
+
+// Validate that all expected transitions exist
+const playingState = config.states.find(s => s.state === GameState.Playing);
+if (playingState && !playingState.toStates.includes(GameState.GameOver)) {
+  throw new Error('Missing required transition: Playing → GameOver');
+}
 ```
 
 ## Tree Shaking

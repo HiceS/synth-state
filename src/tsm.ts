@@ -452,4 +452,196 @@ export class TSM<StateEnum> implements TemporalStateCreator<StateEnum> {
             }
         }
     }
+
+    /**
+     * Generates a printable/serializable representation of the state machine
+     * including all states, transitions, and timeout configurations.
+     * 
+     * @returns A string representation of the state machine for debugging and validation
+     * 
+     * @example
+     * const display = stateMachine.generateStateDisplay();
+     * console.log(display);
+     */
+    generateStateDisplay(): string {
+        const lines: string[] = [];
+        
+        // Header
+        lines.push('STATE MACHINE');
+        lines.push('Current:  ' + this._current);
+        lines.push('Previous: ' + this._previous);
+        lines.push('Initial:  ' + this._initial);
+        lines.push('');
+        
+        // Collect all states
+        const allStates = new Set<StateEnum>();
+        for (const [state, transitions] of this._transitions.entries()) {
+            allStates.add(state);
+            transitions.toStates.forEach(s => allStates.add(s));
+            transitions.fromStates.forEach(s => allStates.add(s));
+        }
+        
+        // Sort states for consistent output (convert to string for sorting)
+        const sortedStates = Array.from(allStates).sort((a, b) => 
+            String(a).localeCompare(String(b))
+        );
+        
+        for (const state of sortedStates) {
+            const transitions = this._transitions.get(state);
+            const isCurrent = state === this._current;
+            const stateMarker = isCurrent ? '* ' : '  ';
+            
+            lines.push(`${stateMarker}${state}`);
+            
+            // Show outgoing transitions
+            if (transitions && transitions.toStates.length > 0) {
+                lines.push(`    -> ${transitions.toStates.join(', ')}`);
+            }
+            
+            // Show timeout configuration if it exists
+            const timeoutConfig = this._timeoutConfigs.get(state);
+            if (timeoutConfig) {
+                const timeoutInfo = [`timeout: ${timeoutConfig.timeoutMs}ms`];
+                if (timeoutConfig.expireTo !== undefined) {
+                    timeoutInfo.push(`expires to ${timeoutConfig.expireTo}`);
+                }
+                if (timeoutConfig.onExpire) {
+                    timeoutInfo.push(`custom callback`);
+                }
+                if (this._activeTimers.has(state)) {
+                    timeoutInfo.push(`ACTIVE`);
+                }
+                lines.push(`    (${timeoutInfo.join(', ')})`);
+            }
+            
+            // Show if there are callbacks registered
+            const callbacks = this._cbMap.get(state);
+            if (callbacks && callbacks.length > 0) {
+                lines.push(`    [${callbacks.length} callback${callbacks.length > 1 ? 's' : ''}]`);
+            }
+        }
+        
+        lines.push('');
+        
+        // Summary
+        let totalTransitions = 0;
+        for (const transitions of this._transitions.values()) {
+            totalTransitions += transitions.toStates.length;
+        }
+        lines.push(`States: ${allStates.size} | Transitions: ${totalTransitions} | Timeouts: ${this._timeoutConfigs.size} | Active: ${this._activeTimers.size}`);
+        
+        return lines.join('\n');
+    }
+
+    /**
+     * Returns a string representation of the state machine.
+     * Alias for generateStateDisplay().
+     * 
+     * @returns A string representation of the state machine
+     * 
+     * @example
+     * console.log(stateMachine.toString());
+     * // or implicitly:
+     * console.log(String(stateMachine));
+     */
+    toString(): string {
+        return this.generateStateDisplay();
+    }
+
+    /**
+     * Generates a JSON-serializable object representation of the state machine
+     * including all states, transitions, and timeout configurations.
+     * 
+     * @returns An object containing the state machine configuration
+     * 
+     * @example
+     * const serialized = stateMachine.serializeStateMachine();
+     * const json = JSON.stringify(serialized, null, 2);
+     */
+    serializeStateMachine(): {
+        current: StateEnum;
+        previous: StateEnum;
+        initial: StateEnum;
+        states: Array<{
+            state: StateEnum;
+            toStates: StateEnum[];
+            fromStates: StateEnum[];
+            timeout?: {
+                timeoutMs: number;
+                expireTo?: StateEnum;
+                hasCallback: boolean;
+                isActive: boolean;
+            };
+            callbackCount: number;
+        }>;
+        summary: {
+            totalStates: number;
+            totalTransitions: number;
+            statesWithTimeouts: number;
+            activeTimers: number;
+        };
+    } {
+        // Collect all states
+        const allStates = new Set<StateEnum>();
+        for (const [state, transitions] of this._transitions.entries()) {
+            allStates.add(state);
+            transitions.toStates.forEach(s => allStates.add(s));
+            transitions.fromStates.forEach(s => allStates.add(s));
+        }
+        
+        // Build state information
+        const states = Array.from(allStates).map(state => {
+            const transitions = this._transitions.get(state);
+            const timeoutConfig = this._timeoutConfigs.get(state);
+            const callbacks = this._cbMap.get(state);
+            
+            const stateInfo: {
+                state: StateEnum;
+                toStates: StateEnum[];
+                fromStates: StateEnum[];
+                timeout?: {
+                    timeoutMs: number;
+                    expireTo?: StateEnum;
+                    hasCallback: boolean;
+                    isActive: boolean;
+                };
+                callbackCount: number;
+            } = {
+                state,
+                toStates: transitions?.toStates || [],
+                fromStates: transitions?.fromStates || [],
+                callbackCount: callbacks?.length || 0,
+            };
+            
+            if (timeoutConfig) {
+                stateInfo.timeout = {
+                    timeoutMs: timeoutConfig.timeoutMs,
+                    expireTo: timeoutConfig.expireTo,
+                    hasCallback: !!timeoutConfig.onExpire,
+                    isActive: this._activeTimers.has(state),
+                };
+            }
+            
+            return stateInfo;
+        });
+        
+        // Calculate summary
+        let totalTransitions = 0;
+        for (const transitions of this._transitions.values()) {
+            totalTransitions += transitions.toStates.length;
+        }
+        
+        return {
+            current: this._current,
+            previous: this._previous,
+            initial: this._initial,
+            states,
+            summary: {
+                totalStates: allStates.size,
+                totalTransitions,
+                statesWithTimeouts: this._timeoutConfigs.size,
+                activeTimers: this._activeTimers.size,
+            },
+        };
+    }
 }
