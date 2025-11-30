@@ -1,0 +1,52 @@
+{
+  "name": "synth-state",
+  "version": "1.0.0",
+  "description": "Common utilities for state management including finite state machines and event dispatchers",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./dispatcher": {
+      "types": "./dist/dispatcher.d.ts",
+      "import": "./dist/dispatcher.js",
+      "require": "./dist/dispatcher.cjs"
+    },
+    "./tsm": {
+      "types": "./dist/tsm.d.ts",
+      "import": "./dist/tsm.js",
+      "require": "./dist/tsm.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "npm run build:types && npm run build:bundle",
+    "build:types": "tsc --emitDeclarationOnly",
+    "build:bundle": "rollup -c",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "state-management",
+    "finite-state-machine",
+    "fsm",
+    "event-dispatcher",
+    "typescript"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@rollup/plugin-typescript": "^12.3.0",
+    "rollup": "^4.53.3",
+    "tslib": "^2.8.1",
+    "typescript": "^5.9.3"
+  }
+}
