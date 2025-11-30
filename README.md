@@ -53,8 +53,8 @@ Temporal State Management (TSM) is a finite state machine implementation that en
 - **Prevents invalid transitions** - Only allows transitions you've explicitly defined
 - **Tracks state history** - Knows both current and previous states
 - **Supports event callbacks** - React to state changes with callbacks
+- **Temporal expiration** - States can automatically expire after a timeout period
 - **Type-safe** - Full TypeScript support with your custom state enums/types
-- **Future-ready** - Designed to support temporal features like timeouts and expiring transitions
 
 ## API Reference
 
@@ -79,17 +79,17 @@ stateMachine.addTransition(StateA, StateB, true);
 #### Multiple Transitions
 
 ```typescript
-// From one state to many states
+// From one state to many states (one-way)
 stateMachine.addTransitions(
   StateA,        // from
-  false,         // loop (bidirectional)
   StateB,        // to
   StateC,        // to
   StateD         // to
 );
+// Creates: A → B, A → C, A → D
 
 // With bidirectional transitions
-stateMachine.addTransitions(StateA, true, StateB, StateC);
+stateMachine.addTransitions(StateA, StateB, StateC, { loop: true });
 // Creates: A ↔ B, A ↔ C
 ```
 
@@ -107,18 +107,29 @@ stateMachine.addPath(StateA, StateB, StateC, StateD, StateE);
 #### Transition to a State
 
 ```typescript
-// Attempts to transition, logs error if invalid
+// Attempts to transition (silently fails if invalid - default)
 const newState = stateMachine.go(StateB);
+
+// Throw error on invalid transition
+try {
+  stateMachine.go(StateB, { throwOnInvalid: true });
+} catch (error) {
+  console.error('Invalid transition:', error.message);
+}
 ```
 
 #### Check if Transition is Valid
 
 ```typescript
 // Returns true/false without actually transitioning
-if (stateMachine.tryGo(StateB)) {
+if (stateMachine.canTransition(StateB)) {
   // Safe to transition
   stateMachine.go(StateB);
 }
+
+// Get all valid transitions from current state
+const validStates = stateMachine.getValidTransitions();
+// Returns: [StateB, StateC, ...]
 ```
 
 ### State Information
@@ -147,11 +158,66 @@ stateMachine
 ### Reset
 
 ```typescript
-// Reset to initial state
+// Reset to initial state (clears all active timeouts)
 stateMachine.reset();
 ```
 
-## Complete Example
+### Temporal State Expiration
+
+States can be configured to automatically expire after a timeout period. This is useful for scenarios like connection timeouts, session expiration, or operation timeouts.
+
+#### Setting State Timeouts
+
+```typescript
+// Auto-transition on expiration
+stateMachine.setStateTimeout(State.Loading, {
+  timeoutMs: 5000,        // 5 seconds
+  expireTo: State.Timeout  // Transition to Timeout state
+});
+
+// Custom callback on expiration
+stateMachine.setStateTimeout(State.Loading, {
+  timeoutMs: 5000,
+  onExpire: (expiredState) => {
+    console.log(`${expiredState} expired after 5 seconds!`);
+    // Custom logic here
+  }
+});
+
+// Both callback and auto-transition (callback takes precedence)
+stateMachine.setStateTimeout(State.Loading, {
+  timeoutMs: 5000,
+  expireTo: State.Timeout,
+  onExpire: (state) => {
+    console.log('Handling expiration...');
+    // Custom logic, then auto-transition will happen if callback doesn't prevent it
+  }
+});
+```
+
+#### Clearing Timeouts
+
+```typescript
+// Remove timeout configuration for a state
+stateMachine.clearStateTimeout(State.Loading);
+
+// Timeouts are automatically cleared when:
+// - State transitions to a different state
+// - reset() is called
+```
+
+#### How Timeouts Work
+
+- When you transition into a state with a timeout configured, a timer starts automatically
+- If you transition away before the timeout, the timer is cleared
+- If the timeout expires:
+  - If `onExpire` callback is provided, it's called
+  - Otherwise, if `expireTo` is provided, it attempts to transition (validates transition first)
+  - If neither is provided, nothing happens
+
+## Complete Examples
+
+### File Upload State Machine
 
 Here's a practical example modeling a file upload process:
 
@@ -201,7 +267,7 @@ uploadFSM
 
 // Use the state machine
 function handleFileSelect() {
-  if (uploadFSM.tryGo(UploadState.Uploading)) {
+  if (uploadFSM.canTransition(UploadState.Uploading)) {
     uploadFSM.go(UploadState.Uploading);
   }
 }
@@ -221,6 +287,121 @@ function retryUpload() {
     uploadFSM.go(UploadState.Uploading);
   }
 }
+```
+
+### Connection State Machine with Timeouts
+
+Here's an example demonstrating temporal state expiration:
+
+```typescript
+import { TSM } from 'synth-state';
+
+enum ConnectionState {
+  Disconnected = 'disconnected',
+  Connecting = 'connecting',
+  Connected = 'connected',
+  Timeout = 'timeout',
+  Error = 'error'
+}
+
+const connectionFSM = new TSM<ConnectionState>(ConnectionState.Disconnected);
+
+// Define state flow
+connectionFSM.addPath(
+  ConnectionState.Disconnected,
+  ConnectionState.Connecting,
+  ConnectionState.Connected
+);
+
+// Error and timeout paths
+connectionFSM.addTransition(ConnectionState.Connecting, ConnectionState.Error);
+connectionFSM.addTransition(ConnectionState.Connecting, ConnectionState.Timeout);
+connectionFSM.addTransition(ConnectionState.Timeout, ConnectionState.Disconnected);
+connectionFSM.addTransition(ConnectionState.Error, ConnectionState.Disconnected);
+
+// Set timeout: Connecting state expires after 10 seconds
+connectionFSM.setStateTimeout(ConnectionState.Connecting, {
+  timeoutMs: 10000, // 10 seconds
+  expireTo: ConnectionState.Timeout
+});
+
+// Set up event handlers
+connectionFSM
+  .on(ConnectionState.Connecting, (from, to) => {
+    console.log('Attempting to connect...');
+    // Timer starts automatically when entering this state
+    attemptConnection();
+  })
+  .on(ConnectionState.Connected, (from, to) => {
+    console.log('Connected! Timeout was automatically cleared.');
+    // Timer was cleared when we transitioned away from Connecting
+  })
+  .on(ConnectionState.Timeout, (from, to) => {
+    console.log('Connection timed out after 10 seconds');
+    showTimeoutMessage();
+  })
+  .on(ConnectionState.Error, (from, to) => {
+    console.log('Connection error occurred');
+    showErrorMessage();
+  });
+
+// Usage
+function startConnection() {
+  connectionFSM.go(ConnectionState.Connecting);
+  // Timer starts automatically
+  // If connection succeeds within 10 seconds, timer is cleared
+  // If 10 seconds pass, automatically transitions to Timeout
+}
+
+function onConnectionSuccess() {
+  // This clears the timeout automatically
+  connectionFSM.go(ConnectionState.Connected);
+}
+
+function onConnectionError() {
+  // This also clears the timeout
+  connectionFSM.go(ConnectionState.Error);
+}
+```
+
+### Session Management with Custom Expiration
+
+Example using expiration callbacks for custom logic:
+
+```typescript
+enum SessionState {
+  Active = 'active',
+  Idle = 'idle',
+  Expired = 'expired'
+}
+
+const sessionFSM = new TSM<SessionState>(SessionState.Active);
+
+sessionFSM.addTransition(SessionState.Active, SessionState.Idle);
+sessionFSM.addTransition(SessionState.Idle, SessionState.Active);
+sessionFSM.addTransition(SessionState.Idle, SessionState.Expired);
+sessionFSM.addTransition(SessionState.Expired, SessionState.Active);
+
+// Idle state expires after 30 minutes with custom handling
+sessionFSM.setStateTimeout(SessionState.Idle, {
+  timeoutMs: 30 * 60 * 1000, // 30 minutes
+  onExpire: (state) => {
+    console.log('Session idle timeout - saving data...');
+    saveUserData();
+    // Manually transition after custom logic
+    sessionFSM.go(SessionState.Expired);
+  }
+});
+
+sessionFSM.on(SessionState.Idle, (from, to) => {
+  console.log('User is idle, starting 30-minute timer...');
+  // Timer starts automatically
+});
+
+sessionFSM.on(SessionState.Active, (from, to) => {
+  console.log('User is active, timer cleared');
+  // Timer was automatically cleared when transitioning from Idle
+});
 ```
 
 ## Tree Shaking
