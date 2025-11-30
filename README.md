@@ -1,4 +1,4 @@
-# synth-state   <img alt="Static Badge" src="https://img.shields.io/badge/https%3A%2F%2Fwww.npmjs.com%2Fpackage%2Fsynth-state?style=flat&logo=npm&label=npm&link=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2Fsynth-state">
+# synth-state   [![npm](https://img.shields.io/badge/https%3A%2F%2Fwww.npmjs.com%2Fpackage%2Fsynth-state?style=flat&logo=npm&label=npm)](https://www.npmjs.com/package/synth-state)
 
 A lightweight TypeScript library for managing application state with **Temporal State Machines (TSM)**. Build robust, type-safe finite state machines with transition validation, event callbacks, and a clean API.
 
