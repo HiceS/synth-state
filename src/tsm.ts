@@ -122,7 +122,6 @@ export class TSM<StateEnum> implements TemporalStateCreator<StateEnum> {
      */
     go(state: StateEnum): StateEnum {
         if (!this.tryGo(state)) {
-            console.error("INVALID STATE TRANSITION FROM %s to %s", this._current, state);
             return this.current;
         }
 
