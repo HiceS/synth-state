@@ -467,15 +467,10 @@ export class TSM<StateEnum> implements TemporalStateCreator<StateEnum> {
         const lines: string[] = [];
         
         // Header
-        lines.push('═══════════════════════════════════════════════════');
-        lines.push('           STATE MACHINE DISPLAY');
-        lines.push('═══════════════════════════════════════════════════');
-        lines.push('');
-        
-        // Current state info
-        lines.push(`Current State:  ${this._current}`);
-        lines.push(`Previous State: ${this._previous}`);
-        lines.push(`Initial State:  ${this._initial}`);
+        lines.push('STATE MACHINE');
+        lines.push('Current:  ' + this._current);
+        lines.push('Previous: ' + this._previous);
+        lines.push('Initial:  ' + this._initial);
         lines.push('');
         
         // Collect all states
@@ -486,11 +481,6 @@ export class TSM<StateEnum> implements TemporalStateCreator<StateEnum> {
             transitions.fromStates.forEach(s => allStates.add(s));
         }
         
-        lines.push('───────────────────────────────────────────────────');
-        lines.push('States and Transitions:');
-        lines.push('───────────────────────────────────────────────────');
-        lines.push('');
-        
         // Sort states for consistent output (convert to string for sorting)
         const sortedStates = Array.from(allStates).sort((a, b) => 
             String(a).localeCompare(String(b))
@@ -499,67 +489,63 @@ export class TSM<StateEnum> implements TemporalStateCreator<StateEnum> {
         for (const state of sortedStates) {
             const transitions = this._transitions.get(state);
             const isCurrent = state === this._current;
-            const stateMarker = isCurrent ? '► ' : '  ';
+            const stateMarker = isCurrent ? '* ' : '  ';
             
-            lines.push(`${stateMarker}[${state}]`);
+            lines.push(`${stateMarker}${state}`);
             
             // Show outgoing transitions
             if (transitions && transitions.toStates.length > 0) {
-                lines.push(`    → Can transition to: ${transitions.toStates.join(', ')}`);
-            } else {
-                lines.push(`    → Can transition to: (none)`);
-            }
-            
-            // Show incoming transitions
-            if (transitions && transitions.fromStates.length > 0) {
-                lines.push(`    ← Can be reached from: ${transitions.fromStates.join(', ')}`);
-            } else {
-                lines.push(`    ← Can be reached from: (none)`);
+                lines.push(`    -> ${transitions.toStates.join(', ')}`);
             }
             
             // Show timeout configuration if it exists
             const timeoutConfig = this._timeoutConfigs.get(state);
             if (timeoutConfig) {
-                lines.push(`    ⏱  Timeout: ${timeoutConfig.timeoutMs}ms`);
+                const timeoutInfo = [`timeout: ${timeoutConfig.timeoutMs}ms`];
                 if (timeoutConfig.expireTo !== undefined) {
-                    lines.push(`       → Expires to: ${timeoutConfig.expireTo}`);
+                    timeoutInfo.push(`expires to ${timeoutConfig.expireTo}`);
                 }
                 if (timeoutConfig.onExpire) {
-                    lines.push(`       → Has custom expiration callback`);
+                    timeoutInfo.push(`custom callback`);
                 }
-                
-                // Show if timer is currently active
                 if (this._activeTimers.has(state)) {
-                    lines.push(`       ⚠ Timer currently active`);
+                    timeoutInfo.push(`ACTIVE`);
                 }
+                lines.push(`    (${timeoutInfo.join(', ')})`);
             }
             
             // Show if there are callbacks registered
             const callbacks = this._cbMap.get(state);
             if (callbacks && callbacks.length > 0) {
-                lines.push(`    📋 Registered callbacks: ${callbacks.length}`);
+                lines.push(`    [${callbacks.length} callback${callbacks.length > 1 ? 's' : ''}]`);
             }
-            
-            lines.push('');
         }
         
-        // Summary
-        lines.push('───────────────────────────────────────────────────');
-        lines.push('Summary:');
-        lines.push('───────────────────────────────────────────────────');
-        lines.push(`Total States: ${allStates.size}`);
+        lines.push('');
         
+        // Summary
         let totalTransitions = 0;
         for (const transitions of this._transitions.values()) {
             totalTransitions += transitions.toStates.length;
         }
-        lines.push(`Total Transitions: ${totalTransitions}`);
-        lines.push(`States with Timeouts: ${this._timeoutConfigs.size}`);
-        lines.push(`Active Timers: ${this._activeTimers.size}`);
-        
-        lines.push('═══════════════════════════════════════════════════');
+        lines.push(`States: ${allStates.size} | Transitions: ${totalTransitions} | Timeouts: ${this._timeoutConfigs.size} | Active: ${this._activeTimers.size}`);
         
         return lines.join('\n');
+    }
+
+    /**
+     * Returns a string representation of the state machine.
+     * Alias for generateStateDisplay().
+     * 
+     * @returns A string representation of the state machine
+     * 
+     * @example
+     * console.log(stateMachine.toString());
+     * // or implicitly:
+     * console.log(String(stateMachine));
+     */
+    toString(): string {
+        return this.generateStateDisplay();
     }
 
     /**

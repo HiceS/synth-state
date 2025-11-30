@@ -171,43 +171,49 @@ Visualize and debug your state machine with built-in display and serialization f
 Generate a human-readable representation of your state machine:
 
 ```typescript
-// Print a formatted display of the entire state machine
+// Using toString() method
+console.log(stateMachine.toString());
+
+// Or implicitly with String conversion
+console.log(String(stateMachine));
+
+// Or using the explicit method
 const display = stateMachine.generateStateDisplay();
 console.log(display);
 ```
 
 The display includes:
 - Current, previous, and initial states
-- All states with their incoming and outgoing transitions
+- All states with their outgoing transitions
 - Timeout configurations (duration, expiration target, active status)
 - Registered callback counts
 - Summary statistics
 
 Example output:
 ```
-═══════════════════════════════════════════════════
-           STATE MACHINE DISPLAY
-═══════════════════════════════════════════════════
+STATE MACHINE
+Current:  Playing
+Previous: Loading
+Initial:  Menu
 
-Current State:  Playing
-Previous State: Loading
-Initial State:  Menu
+  GameOver
+    -> Menu, Playing
+    (timeout: 10000ms, custom callback)
+    [1 callback]
 
-───────────────────────────────────────────────────
-States and Transitions:
-───────────────────────────────────────────────────
+  Loading
+    -> Playing
+    (timeout: 5000ms, expires to Playing)
 
-  [Loading]
-    → Can transition to: Playing
-    ← Can be reached from: Menu
-    ⏱  Timeout: 5000ms
-       → Expires to: Playing
+* Playing
+    -> Paused, GameOver, Victory
+    [1 callback]
 
-► [Playing]
-    → Can transition to: Paused, GameOver
-    ← Can be reached from: Loading, Paused
-    📋 Registered callbacks: 1
-...
+  Paused
+    -> Playing, Menu
+    (timeout: 3000ms, expires to Menu)
+
+States: 6 | Transitions: 10 | Timeouts: 3 | Active: 0
 ```
 
 #### Serialize State Machine
@@ -529,12 +535,12 @@ game.setStateTimeout(GameState.Loading, {
 });
 
 game.setStateTimeout(GameState.Paused, {
-  timeoutMs: 30000,
+  timeoutMs: 3000,
   expireTo: GameState.Menu
 });
 
 // Display the complete state machine for debugging
-console.log(game.generateStateDisplay());
+console.log(game.toString());
 
 // Or serialize for validation/testing
 const config = game.serializeStateMachine();

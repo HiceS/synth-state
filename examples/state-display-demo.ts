@@ -37,12 +37,12 @@ game.setStateTimeout(GameState.Loading, {
 });
 
 game.setStateTimeout(GameState.Paused, {
-    timeoutMs: 300000, // 5 minutes
+    timeoutMs: 3000, // 3 seconds
     expireTo: GameState.MainMenu,
 });
 
 game.setStateTimeout(GameState.GameOver, {
-    timeoutMs: 10000,
+    timeoutMs: 5000, // 5 seconds
     onExpire: (state) => {
         console.log(`\n[TIMEOUT] ${state} expired - returning to main menu`);
         game.go(GameState.MainMenu);
@@ -65,62 +65,58 @@ game.on(GameState.Victory, (from, to) => {
 // ============================================================================
 // DEMONSTRATION 1: Display at initial state
 // ============================================================================
-console.log('═══════════════════════════════════════════════════════════════');
 console.log('DEMO 1: Initial State Machine Configuration');
-console.log('═══════════════════════════════════════════════════════════════\n');
-console.log(game.generateStateDisplay());
+console.log('------------------------------------------------------------\n');
+console.log(game.toString());
 
 // ============================================================================
 // DEMONSTRATION 2: Display after some transitions
 // ============================================================================
-console.log('\n\n═══════════════════════════════════════════════════════════════');
-console.log('DEMO 2: After transitioning MainMenu → Loading → Playing');
-console.log('═══════════════════════════════════════════════════════════════\n');
+console.log('\n\nDEMO 2: After transitioning MainMenu → Loading → Playing');
+console.log('------------------------------------------------------------\n');
 game.go(GameState.Loading);
 game.go(GameState.Playing);
-console.log(game.generateStateDisplay());
+console.log(game.toString());
 
 // ============================================================================
 // DEMONSTRATION 3: JSON Serialization
 // ============================================================================
-console.log('\n\n═══════════════════════════════════════════════════════════════');
-console.log('DEMO 3: JSON Serialization (for persistence/validation)');
-console.log('═══════════════════════════════════════════════════════════════\n');
+console.log('\n\nDEMO 3: JSON Serialization (for persistence/validation)');
+console.log('------------------------------------------------------------\n');
 const serialized = game.serializeStateMachine();
 console.log(JSON.stringify(serialized, null, 2));
 
 // ============================================================================
 // DEMONSTRATION 4: Using serialization for validation
 // ============================================================================
-console.log('\n\n═══════════════════════════════════════════════════════════════');
-console.log('DEMO 4: State Machine Validation Using Serialization');
-console.log('═══════════════════════════════════════════════════════════════\n');
+console.log('\n\nDEMO 4: State Machine Validation Using Serialization');
+console.log('------------------------------------------------------------\n');
 
 // Validate the state machine configuration
 const config = game.serializeStateMachine();
 
-console.log('📊 Summary Statistics:');
+console.log('Summary Statistics:');
 console.log(`   Total States: ${config.summary.totalStates}`);
 console.log(`   Total Transitions: ${config.summary.totalTransitions}`);
 console.log(`   States with Timeouts: ${config.summary.statesWithTimeouts}`);
 console.log(`   Active Timers: ${config.summary.activeTimers}`);
 
-console.log('\n✅ Validation Checks:');
+console.log('\nValidation Checks:');
 
 // Check 1: Verify critical transitions exist
 const playingState = config.states.find(s => s.state === GameState.Playing);
 if (playingState?.toStates.includes(GameState.GameOver)) {
-    console.log('   ✓ Playing can transition to GameOver');
+    console.log('   [OK] Playing can transition to GameOver');
 } else {
-    console.log('   ✗ ERROR: Missing transition Playing → GameOver');
+    console.log('   [ERROR] Missing transition Playing -> GameOver');
 }
 
 // Check 2: Verify timeout configurations
 const loadingState = config.states.find(s => s.state === GameState.Loading);
 if (loadingState?.timeout && loadingState.timeout.timeoutMs === 5000) {
-    console.log('   ✓ Loading state has correct timeout (5000ms)');
+    console.log('   [OK] Loading state has correct timeout (5000ms)');
 } else {
-    console.log('   ✗ ERROR: Loading state timeout is incorrect');
+    console.log('   [ERROR] Loading state timeout is incorrect');
 }
 
 // Check 3: Verify bidirectional transitions
@@ -129,9 +125,9 @@ if (
     playingState?.toStates.includes(GameState.Paused) &&
     pausedState?.toStates.includes(GameState.Playing)
 ) {
-    console.log('   ✓ Playing ↔ Paused bidirectional transitions exist');
+    console.log('   [OK] Playing <-> Paused bidirectional transitions exist');
 } else {
-    console.log('   ✗ ERROR: Bidirectional transitions incomplete');
+    console.log('   [ERROR] Bidirectional transitions incomplete');
 }
 
 // Check 4: Verify all states are reachable
@@ -139,23 +135,22 @@ const unreachableStates = config.states.filter(s =>
     s.fromStates.length === 0 && s.state !== config.initial
 );
 if (unreachableStates.length === 0) {
-    console.log('   ✓ All states are reachable from some other state');
+    console.log('   [OK] All states are reachable from some other state');
 } else {
-    console.log(`   ⚠ Warning: Found ${unreachableStates.length} unreachable states:`, 
+    console.log(`   [WARN] Found ${unreachableStates.length} unreachable states: ` + 
         unreachableStates.map(s => s.state).join(', '));
 }
 
 // Check 5: Verify dead-end states are intentional
 const deadEndStates = config.states.filter(s => s.toStates.length === 0);
-console.log(`   ℹ Found ${deadEndStates.length} dead-end states: ` + 
+console.log(`   [INFO] Found ${deadEndStates.length} dead-end states: ` + 
     deadEndStates.map(s => s.state).join(', '));
 
 // ============================================================================
 // DEMONSTRATION 5: Monitoring active timers
 // ============================================================================
-console.log('\n\n═══════════════════════════════════════════════════════════════');
-console.log('DEMO 5: Monitoring Active Timers');
-console.log('═══════════════════════════════════════════════════════════════\n');
+console.log('\n\nDEMO 5: Monitoring Active Timers');
+console.log('------------------------------------------------------------\n');
 
 // Pause the game to start a timer
 console.log('Pausing the game...');
@@ -167,17 +162,16 @@ const pausedStateWithTimer = configWithTimer.states.find(s => s.state === GameSt
 console.log(`\nPaused state timeout configuration:`);
 console.log(`   Timeout: ${pausedStateWithTimer?.timeout?.timeoutMs}ms`);
 console.log(`   Expires to: ${pausedStateWithTimer?.timeout?.expireTo}`);
-console.log(`   Timer active: ${pausedStateWithTimer?.timeout?.isActive ? '⏱️  YES' : '❌ NO'}`);
+console.log(`   Timer active: ${pausedStateWithTimer?.timeout?.isActive ? 'YES' : 'NO'}`);
 
-console.log('\n📊 Current State Display:');
-console.log(game.generateStateDisplay());
+console.log('\nCurrent State Display:');
+console.log(game.toString());
 
 // ============================================================================
 // DEMONSTRATION 6: Export for documentation
 // ============================================================================
-console.log('\n\n═══════════════════════════════════════════════════════════════');
-console.log('DEMO 6: Generate Documentation from State Machine');
-console.log('═══════════════════════════════════════════════════════════════\n');
+console.log('\n\nDEMO 6: Generate Documentation from State Machine');
+console.log('------------------------------------------------------------\n');
 
 function generateDocumentation(fsm: TSM<GameState>): string {
     const config = fsm.serializeStateMachine();
@@ -222,6 +216,6 @@ function generateDocumentation(fsm: TSM<GameState>): string {
 const documentation = generateDocumentation(game);
 console.log(documentation);
 
-console.log('\n═══════════════════════════════════════════════════════════════');
+console.log('\n------------------------------------------------------------');
 console.log('Demo Complete!');
-console.log('═══════════════════════════════════════════════════════════════\n');
+console.log('------------------------------------------------------------\n');
